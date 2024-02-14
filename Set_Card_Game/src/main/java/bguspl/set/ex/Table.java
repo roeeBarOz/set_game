@@ -3,6 +3,7 @@ package bguspl.set.ex;
 import bguspl.set.Env;
 
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -29,6 +30,9 @@ public class Table {
      */
     protected final Integer[] cardToSlot; // slot per card (if any)
 
+
+    protected final Boolean[][] tokenToSlot;
+
     /**
      * Constructor for testing.
      *
@@ -41,6 +45,12 @@ public class Table {
         this.env = env;
         this.slotToCard = slotToCard;
         this.cardToSlot = cardToSlot;
+        tokenToSlot = new Boolean[env.config.players][12];
+        for (Boolean[] i : tokenToSlot) {
+            for (Boolean j : i) {
+                j = false;
+            }
+        }
     }
 
     /**
@@ -95,6 +105,7 @@ public class Table {
         slotToCard[slot] = card;
 
         // TODO implement
+        env.ui.placeCard(card, slot);
     }
 
     /**
@@ -107,6 +118,7 @@ public class Table {
         } catch (InterruptedException ignored) {}
 
         // TODO implement
+        env.ui.removeCard(slot);
     }
 
     /**
@@ -116,6 +128,8 @@ public class Table {
      */
     public void placeToken(int player, int slot) {
         // TODO implement
+        env.ui.placeToken(player, slot);
+        tokenToSlot[player][slot] = true;
     }
 
     /**
@@ -126,6 +140,19 @@ public class Table {
      */
     public boolean removeToken(int player, int slot) {
         // TODO implement
+        env.ui.removeToken(player, slot);
+        tokenToSlot[player][slot] = false;
         return false;
+    }
+
+    /*
+    * Returns all the empty slots.
+    **/
+    public List<Integer> getAllEmptySlots(){
+        List<Integer> output = new LinkedList<Integer>();
+        for (int i = 0; i<12; i++){
+            if(slotToCard[i] == null) output.add(i);
+        }
+        return output;
     }
 }

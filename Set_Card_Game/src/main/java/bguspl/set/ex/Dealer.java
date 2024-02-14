@@ -3,6 +3,7 @@ package bguspl.set.ex;
 import bguspl.set.Env;
 
 import java.util.List;
+import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -61,7 +62,8 @@ public class Dealer implements Runnable {
     }
 
     /**
-     * The inner loop of the dealer thread that runs as long as the countdown did not time out.
+     * The inner loop of the dealer thread that runs as long as the countdown did
+     * not time out.
      */
     private void timerLoop() {
         while (!terminate && System.currentTimeMillis() < reshuffleTime) {
@@ -100,10 +102,20 @@ public class Dealer implements Runnable {
      */
     private void placeCardsOnTable() {
         // TODO implement
+        if(table.countCards() < 12 && deck.size() > 0){
+            for (int i = 0; i<deck.size(); i++){
+                List<Integer> empties = table.getAllEmptySlots();
+                Random rand = new Random();
+                int randomIndex = rand.nextInt(empties.size());
+                table.placeCard(deck.get(i), empties.get(randomIndex));
+                empties.remove(randomIndex);
+            }
+        }
     }
 
     /**
-     * Sleep for a fixed amount of time or until the thread is awakened for some purpose.
+     * Sleep for a fixed amount of time or until the thread is awakened for some
+     * purpose.
      */
     private void sleepUntilWokenOrTimeout() {
         // TODO implement
@@ -114,6 +126,9 @@ public class Dealer implements Runnable {
      */
     private void updateTimerDisplay(boolean reset) {
         // TODO implement
+        if (reset) {
+            env.ui.setCountdown(60000,false);
+        }
     }
 
     /**
