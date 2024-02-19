@@ -57,11 +57,11 @@ public class Player implements Runnable {
 
     private Dealer dealer;
 
-    private int activeTokens;
+    public int activeTokens;
 
     private Queue<Integer> keypressed;
 
-    public boolean setResult;
+    public int[] set;
     /**
      * The class constructor.
      *
@@ -72,6 +72,10 @@ public class Player implements Runnable {
      * @param human  - true iff the player is a human player (i.e. input is provided
      *               manually, via the keyboard).
      */
+
+    public boolean shouldPoint;
+    public boolean shouldPenalty;
+
     public Player(Env env, Dealer dealer, Table table, int id, boolean human) {
         this.env = env;
         this.table = table;
@@ -80,8 +84,12 @@ public class Player implements Runnable {
         this.dealer = dealer;
         this.activeTokens = 0;
         keypressed = new LinkedList<Integer>();
-        setResult = false;
+        set = new int[3];
+        for (int i = 0; i < set.length; i++)
+            set[i] = -1;
         terminate = false;
+        shouldPoint = false;
+        shouldPenalty = false;
     }
 
     /**
@@ -94,10 +102,16 @@ public class Player implements Runnable {
         env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
         if (!human)
             createArtificialIntelligence();
-
         while (!terminate) {
             // TODO implement main player loop
             tokenHandling();
+            if (shouldPoint) {
+                shouldPoint = false;
+                point();
+            } else if (shouldPenalty) {
+                shouldPenalty = false;
+                penalty();
+            }
         }
         if (!human)
             try {
@@ -113,7 +127,6 @@ public class Player implements Runnable {
      * key presses. If the queue of key presses is full, the thread waits until it
      * is not full.
      */
-    @SuppressWarnings("unchecked")
     private void createArtificialIntelligence() {
         // note: this is a very, very smart AI (!)
         aiThread = new Thread(() -> {
@@ -121,7 +134,7 @@ public class Player implements Runnable {
             Random rnd = new Random();
             while (!terminate) {
                 // TODO implement player key press simulator
-                
+
                 try {
                     synchronized (this) {
                         wait();
@@ -151,24 +164,36 @@ public class Player implements Runnable {
         keypressed.add(slot);
     }
 
-    public void tokenHandling(){
+    public void tokenHandling() {
         if (!keypressed.isEmpty()) {
             int slot = keypressed.remove();
-            if (table.isTokenPlaced(id, slot))
-            {
-                activeTokens--;
-                table.removeToken(id, slot);
+            synchronized (table.slots[slot]) {
+                if (table.isTokenPlaced(id, slot)) {
+                    for (int i = 0; i < set.length; i++)
+                        if (set[i] == slot) {
+                            set[i] = -1;
+                            break;
+                        }
+                    activeTokens--;
+                    table.removeToken(id, slot);
+                } else if (activeTokens < 3) {
+                    for (int i = 0; i < set.length; i++)
+                        if (set[i] == -1) {
+                            set[i] = slot;
+                            break;
+                        }
+                    activeTokens++;
+                    table.placeToken(id, slot);
+                }
+                if (activeTokens == 3) {
+                    dealer.addToWaiting(id);
+                }
             }
-            else if(activeTokens < 3)
-            {
-                activeTokens++;
-                table.placeToken(id, slot);
-            }
-            if(activeTokens == 3) {
-                dealer.addToWaiting(id);
-            }
+            
         }
     }
+
+    
 
     /**
      * Award a point to a player and perform other related actions.
@@ -176,21 +201,16 @@ public class Player implements Runnable {
      * @post - the player's score is increased by 1.
      * @post - the player's score is updated in the ui.
      */
-    public void point() {
+    public synchronized void point() {
         // TODO implement
-        activeTokens = 0;
-        
-
 
         int ignored = table.countCards(); // this part is just for demonstration in the unit tests
         env.ui.setScore(id, ++score);
 
-
-        try 
-        {
+        try {
             Thread.sleep(env.config.pointFreezeMillis);
+        } catch (InterruptedException e) {
         }
-        catch(InterruptedException e){}
     }
 
     /**
@@ -199,18 +219,13 @@ public class Player implements Runnable {
     public void penalty() {
         // TODO implement
 
-        try 
-        {
+        try {
             Thread.sleep(env.config.penaltyFreezeMillis);
+        } catch (InterruptedException e) {
         }
-        catch(InterruptedException e){}
     }
 
     public int score() {
         return score;
-    }
-
-    public void tableCleared(){
-        activeTokens = 0;
     }
 }
