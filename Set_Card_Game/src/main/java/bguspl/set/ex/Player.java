@@ -136,7 +136,8 @@ public class Player implements Runnable {
             Random rnd = new Random();
             while (!terminate) {
                 // TODO implement player key press simulator
-
+                int pressSlot = rnd.nextInt(12);
+                addToken(pressSlot);
                 try {
                     synchronized (this) {
                         wait();

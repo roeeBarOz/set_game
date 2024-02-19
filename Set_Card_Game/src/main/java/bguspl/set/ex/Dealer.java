@@ -217,6 +217,30 @@ public class Dealer implements Runnable {
      */
     private void announceWinners() {
         // TODO implement
+        int[] winners = findWinners();
+        env.ui.announceWinner(winners);
+    }
+
+    private int[] findWinners() {
+        int max = 0;
+        for(Player p : players){
+            if(p.score() > max)
+                max = p.score();            
+        }
+        int winnerCount = 0;
+        for(Player p : players){
+            if(p.score() == max)
+                winnerCount++;
+        }
+        int[] winners = new int[winnerCount];
+        winnerCount = 0;
+        for(Player p : players){
+            if(p.score() == max){
+                winners[winnerCount] = p.id;
+                winnerCount++;
+            }
+        }
+        return winners;
     }
 
     public void addToWaiting(int id) {
