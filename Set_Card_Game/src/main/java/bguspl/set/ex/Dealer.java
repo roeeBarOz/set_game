@@ -110,26 +110,30 @@ public class Dealer implements Runnable {
 
         if (!waitingPlayers.isEmpty()) {
             int awardplayer = waitingPlayers.remove();
-            synchronized (players[awardplayer]) {
-                boolean isSet = env.util.testSet(players[awardplayer].set);
-                if (isSet) {
-                    players[awardplayer].shouldPoint = true;
-                    for (int i = 0; i < players[awardplayer].set.length; i++) {
-                        synchronized(table.slots[i]){
-                            table.removeCard(players[awardplayer].set[i]);
-                            for(int j = 0; j < players.length; j++){
-                                table.removeToken(j, players[j].set[i]);
-                                table.slotToCard[players[j].set[i]] = null;
-                                table.cardToSlot[players[j].set[i]] = null;
+            if (isSetStillValid(awardplayer)) {
+
+                synchronized (players[awardplayer]) {
+                    boolean isSet = env.util.testSet(convertToCards(players[awardplayer].set));
+                    if (isSet) {
+                        for (int i = 0; i < players[awardplayer].set.length; i++) {
+                            synchronized (table.slots[i]) {
+                                table.removeCard(players[awardplayer].set[i]);
+                                for (int j = 0; j < players.length; j++) {
+                                    if (players[j].set[i] != -1)
+                                        table.removeToken(awardplayer, players[j].set[i]);
+                                }
+                                table.slotToCard[players[awardplayer].set[i]] = null;
+                                table.cardToSlot[players[awardplayer].set[i]] = null;
+                                players[awardplayer].set[i] = -1;
                             }
                         }
-                        players[awardplayer].set[i] = -1;
+                        players[awardplayer].activeTokens = 0;
+                        reshuffleTime = System.currentTimeMillis() + env.config.turnTimeoutMillis;
+                        updateTimerDisplay(true);
+                        players[awardplayer].shouldPoint = true;
+                    } else {
+                        players[awardplayer].shouldPenalty = true;
                     }
-                    players[awardplayer].activeTokens = 0;
-                    reshuffleTime = System.currentTimeMillis() + env.config.turnTimeoutMillis;
-                    updateTimerDisplay(true);
-                } else {
-                    players[awardplayer].shouldPenalty = true;
                 }
             }
         }
@@ -155,18 +159,14 @@ public class Dealer implements Runnable {
      * Sleep for a fixed amount of time or until the thread is awakened for some
      * purpose.
      */
-    private /* synchronized */ void sleepUntilWokenOrTimeout() {
+    private synchronized void sleepUntilWokenOrTimeout() {
         // TODO implement
-        /*
-         * long currentTime = System.currentTimeMillis() + 500;
-         * while(waitingPlayers.size() == 0 && currentTime - System.currentTimeMillis()
-         * > 0)
-         * try {
-         * this.wait();
-         * } catch (InterruptedException e) {
-         * }
-         * this.notifyAll();
-         */
+        try {
+            this.wait(500);
+        } catch (InterruptedException e) {
+        }
+        this.notifyAll();
+
     }
 
     /**
@@ -225,4 +225,18 @@ public class Dealer implements Runnable {
         }
     }
 
+    private boolean isSetStillValid(int id) {
+        for (int i = 0; i < players[id].set.length; i++) {
+            if (!table.isTokenPlaced(id, players[id].set[i]))
+                return false;
+        }
+        return true;
+    }
+
+    private int[] convertToCards(int[] cardIds) {
+        int[] cards = new int[cardIds.length];
+        for (int i = 0; i < cards.length; i++)
+            cards[i] = table.slotToCard[cardIds[i]];
+        return cards;
+    }
 }

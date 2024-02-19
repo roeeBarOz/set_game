@@ -75,6 +75,7 @@ public class Player implements Runnable {
 
     public boolean shouldPoint;
     public boolean shouldPenalty;
+    private boolean isFrozen;
 
     public Player(Env env, Dealer dealer, Table table, int id, boolean human) {
         this.env = env;
@@ -90,6 +91,7 @@ public class Player implements Runnable {
         terminate = false;
         shouldPoint = false;
         shouldPenalty = false;
+        isFrozen = false;
     }
 
     /**
@@ -161,7 +163,8 @@ public class Player implements Runnable {
      */
     public void keyPressed(int slot) {
         // TODO implement
-        keypressed.add(slot);
+        if (!isFrozen)
+            keypressed.add(slot);
     }
 
     public void tokenHandling() {
@@ -169,31 +172,37 @@ public class Player implements Runnable {
             int slot = keypressed.remove();
             synchronized (table.slots[slot]) {
                 if (table.isTokenPlaced(id, slot)) {
-                    for (int i = 0; i < set.length; i++)
-                        if (set[i] == slot) {
-                            set[i] = -1;
-                            break;
-                        }
-                    activeTokens--;
-                    table.removeToken(id, slot);
+                    removeToken(slot);
                 } else if (activeTokens < 3) {
-                    for (int i = 0; i < set.length; i++)
-                        if (set[i] == -1) {
-                            set[i] = slot;
-                            break;
-                        }
-                    activeTokens++;
-                    table.placeToken(id, slot);
+                    addToken(slot);
                 }
                 if (activeTokens == 3) {
                     dealer.addToWaiting(id);
                 }
             }
-            
+
         }
     }
 
-    
+    public void removeToken(int slot) {
+        for (int i = 0; i < set.length; i++)
+            if (set[i] == slot) {
+                set[i] = -1;
+                break;
+            }
+        activeTokens--;
+        table.removeToken(id, slot);
+    }
+
+    public void addToken(int slot) {
+        for (int i = 0; i < set.length; i++)
+            if (set[i] == -1) {
+                set[i] = slot;
+                break;
+            }
+        activeTokens++;
+        table.placeToken(id, slot);
+    }
 
     /**
      * Award a point to a player and perform other related actions.
@@ -203,6 +212,8 @@ public class Player implements Runnable {
      */
     public synchronized void point() {
         // TODO implement
+        isFrozen = true;
+        env.ui.setFreeze(id, env.config.pointFreezeMillis);
 
         int ignored = table.countCards(); // this part is just for demonstration in the unit tests
         env.ui.setScore(id, ++score);
@@ -211,6 +222,8 @@ public class Player implements Runnable {
             Thread.sleep(env.config.pointFreezeMillis);
         } catch (InterruptedException e) {
         }
+        env.ui.setFreeze(id, 0);
+        isFrozen = false;
     }
 
     /**
@@ -218,11 +231,17 @@ public class Player implements Runnable {
      */
     public void penalty() {
         // TODO implement
+        isFrozen = true;
+        for (long i = env.config.penaltyFreezeMillis; i > 0; i -= 1000) {
 
-        try {
-            Thread.sleep(env.config.penaltyFreezeMillis);
-        } catch (InterruptedException e) {
+            env.ui.setFreeze(id, i);
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+            }
         }
+        env.ui.setFreeze(id, 0);
+        isFrozen = false;
     }
 
     public int score() {
