@@ -1,8 +1,8 @@
 package bguspl.set.ex;
 
-import java.util.LinkedList;
-import java.util.Queue;
 import java.util.Random;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import bguspl.set.Env;
 
@@ -59,7 +59,7 @@ public class Player implements Runnable {
 
     public int activeTokens;
 
-    private Queue<Integer> keypressed;
+    private BlockingQueue<Integer> keyspressed;
 
     public int[] set;
     /**
@@ -84,7 +84,7 @@ public class Player implements Runnable {
         this.human = human;
         this.dealer = dealer;
         this.activeTokens = 0;
-        keypressed = new LinkedList<Integer>();
+        keyspressed = new LinkedBlockingQueue<>(3);
         set = new int[3];
         for (int i = 0; i < set.length; i++)
             set[i] = -1;
@@ -165,12 +165,16 @@ public class Player implements Runnable {
     public void keyPressed(int slot) {
         // TODO implement
         if (!isFrozen)
-            keypressed.add(slot);
+        {
+            try {
+                keyspressed.put(slot);
+            } catch (InterruptedException e) {}
+        }
     }
 
     public void tokenHandling() {
-        if (!keypressed.isEmpty()) {
-            int slot = keypressed.remove();
+        if (!keyspressed.isEmpty()) {
+            int slot = keyspressed.remove();
             synchronized (table.slots[slot]) {
                 if (table.isTokenPlaced(id, slot)) {
                     removeToken(slot);

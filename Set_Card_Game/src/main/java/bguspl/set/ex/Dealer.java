@@ -7,6 +7,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
 import java.util.Random;
+import java.util.concurrent.Semaphore;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -38,6 +39,8 @@ public class Dealer implements Runnable {
 
     private Queue<Integer> waitingPlayers;
 
+    private Semaphore dealerSemaphore;
+
     /**
      * The time when the dealer needs to reshuffle the deck due to turn timeout.
      */
@@ -49,6 +52,7 @@ public class Dealer implements Runnable {
         this.players = players;
         deck = IntStream.range(0, env.config.deckSize).boxed().collect(Collectors.toList());
         waitingPlayers = new LinkedList<Integer>();
+        dealerSemaphore = new Semaphore(1, true);
     }
 
     /**
@@ -91,6 +95,8 @@ public class Dealer implements Runnable {
     public void terminate() {
         // TODO implement
         terminate = true;
+        for(Player p : players)
+            p.terminate();
     }
 
     /**
