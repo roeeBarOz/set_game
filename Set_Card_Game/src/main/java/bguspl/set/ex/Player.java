@@ -3,6 +3,7 @@ package bguspl.set.ex;
 import java.util.Random;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Semaphore;
 
 import bguspl.set.Env;
 
@@ -75,7 +76,8 @@ public class Player implements Runnable {
 
     public boolean shouldPoint;
     public boolean shouldPenalty;
-    private boolean isFrozen;
+
+    public Object lock;
 
     public Player(Env env, Dealer dealer, Table table, int id, boolean human) {
         this.env = env;
@@ -91,7 +93,7 @@ public class Player implements Runnable {
         terminate = false;
         shouldPoint = false;
         shouldPenalty = false;
-        isFrozen = false;
+        lock = new Object();
     }
 
     /**
@@ -104,17 +106,13 @@ public class Player implements Runnable {
         env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
         if (!human)
             createArtificialIntelligence();
-        while (!terminate) {
-            // TODO implement main player loop
-            tokenHandling();
-            if (shouldPoint) {
-                shouldPoint = false;
-                point();
-            } else if (shouldPenalty) {
-                shouldPenalty = false;
-                penalty();
+        else {
+            while (!terminate) {
+                // TODO implement main player loop
+                play();
             }
         }
+        System.out.println("bye bye!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         if (!human)
             try {
                 aiThread.join();
@@ -136,13 +134,10 @@ public class Player implements Runnable {
             Random rnd = new Random();
             while (!terminate) {
                 // TODO implement player key press simulator
-                int pressSlot = rnd.nextInt(12);
-                addToken(pressSlot);
-                try {
-                    synchronized (this) {
-                        wait();
-                    }
-                } catch (InterruptedException ignored) {
+                if (dealer.cardsPlaced) {
+                    int pressSlot = rnd.nextInt(12);
+                    this.keyspressed.add(pressSlot);
+                    play();
                 }
             }
             env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
@@ -155,6 +150,18 @@ public class Player implements Runnable {
      */
     public void terminate() {
         // TODO implement
+        terminate = true;
+    }
+
+    private void play() {
+        tokenHandling();
+        if (shouldPoint) {
+            shouldPoint = false;
+            point();
+        } else if (shouldPenalty) {
+            shouldPenalty = false;
+            penalty();
+        }
     }
 
     /**
@@ -164,49 +171,79 @@ public class Player implements Runnable {
      */
     public void keyPressed(int slot) {
         // TODO implement
-        if (!isFrozen)
-        {
+        if (dealer.cardsPlaced) {
             try {
                 keyspressed.put(slot);
-            } catch (InterruptedException e) {}
+            } catch (InterruptedException e) {
+            }
         }
     }
 
     public void tokenHandling() {
-        if (!keyspressed.isEmpty()) {
-            int slot = keyspressed.remove();
-            synchronized (table.slots[slot]) {
-                if (table.isTokenPlaced(id, slot)) {
-                    removeToken(slot);
-                } else if (activeTokens < 3) {
-                    addToken(slot);
-                }
-                if (activeTokens == 3) {
-                    dealer.addToWaiting(id);
+        synchronized (keyspressed) {
+            if (!keyspressed.isEmpty()) {
+                int slot = keyspressed.remove();
+                if (table.slotToCard[slot] != null) {
+                    if (table.isTokenPlaced(id, slot)) {
+                        removeToken(slot);
+                    } else if (activeTokens < 3) {
+                        addToken(slot);
+                        if (activeTokens == 3) {
+                            // dealer.addToWaiting(id);
+                            synchronized (dealer.waitingPlayers) {
+                                dealer.addWaiting(id);
+                            }
+                            synchronized (this) {
+                                try {
+                                    this.wait();
+                                } catch (InterruptedException e) {
+                                    this.notifyAll();
+                                }
+                            }
+                            // dealer.notifyAll();
+                            /*
+                             * try {
+                             * env.logger.info("player " + (id + 1) + " in lock");
+                             * // System.out.println("Player: " + id + " is sleeping");
+                             * this.wait();
+                             * env.logger.info("player " + (id + 1) + " out of lock");
+                             * System.out.println("tcatchhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh");
+                             * } catch (InterruptedException e) {
+                             * }
+                             */
+                        }
+                    }
                 }
             }
-
         }
     }
 
     public void removeToken(int slot) {
-        for (int i = 0; i < set.length; i++)
-            if (set[i] == slot) {
-                set[i] = -1;
-                break;
+        synchronized (table.slots[slot]) {
+            boolean isRemoved = false;
+            for (int i = 0; i < set.length; i++)
+                if (set[i] == slot) {
+                    set[i] = -1;
+                    isRemoved = true;
+                    break;
+                }
+            if (isRemoved) {
+                activeTokens--;
+                table.removeToken(id, slot);
             }
-        activeTokens--;
-        table.removeToken(id, slot);
+        }
     }
 
     public void addToken(int slot) {
-        for (int i = 0; i < set.length; i++)
-            if (set[i] == -1) {
-                set[i] = slot;
-                break;
-            }
-        activeTokens++;
-        table.placeToken(id, slot);
+        synchronized (table.slots[slot]) {
+            for (int i = 0; i < set.length; i++)
+                if (set[i] == -1) {
+                    set[i] = slot;
+                    break;
+                }
+            activeTokens++;
+            table.placeToken(id, slot);
+        }
     }
 
     /**
@@ -215,11 +252,9 @@ public class Player implements Runnable {
      * @post - the player's score is increased by 1.
      * @post - the player's score is updated in the ui.
      */
-    public synchronized void point() {
+    public void point() {
         // TODO implement
-        isFrozen = true;
         env.ui.setFreeze(id, env.config.pointFreezeMillis);
-
         int ignored = table.countCards(); // this part is just for demonstration in the unit tests
         env.ui.setScore(id, ++score);
 
@@ -227,8 +262,8 @@ public class Player implements Runnable {
             Thread.sleep(env.config.pointFreezeMillis);
         } catch (InterruptedException e) {
         }
+
         env.ui.setFreeze(id, 0);
-        isFrozen = false;
     }
 
     /**
@@ -236,7 +271,6 @@ public class Player implements Runnable {
      */
     public void penalty() {
         // TODO implement
-        isFrozen = true;
         for (long i = env.config.penaltyFreezeMillis; i > 0; i -= 1000) {
 
             env.ui.setFreeze(id, i);
@@ -246,7 +280,6 @@ public class Player implements Runnable {
             }
         }
         env.ui.setFreeze(id, 0);
-        isFrozen = false;
     }
 
     public int score() {
