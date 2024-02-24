@@ -76,6 +76,7 @@ public class Dealer implements Runnable {
             updateTimerDisplay(true);
             removeAllCardsFromTable();
         }
+        removeAllCardsFromTable();
         announceWinners();
         env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
     }
@@ -86,7 +87,7 @@ public class Dealer implements Runnable {
      */
     private void timerLoop() {
         while (!terminate && System.currentTimeMillis() < reshuffleTime) {
-            //sleepUntilWokenOrTimeout();
+            // sleepUntilWokenOrTimeout();
             updateTimerDisplay(false);
             removeCardsFromTable();
             placeCardsOnTable();
@@ -99,10 +100,11 @@ public class Dealer implements Runnable {
     public void terminate() {
         // TODO implement
         terminate = true;
-        for (Player p : players)
-            p.terminate();
-        for(Thread t : playerThreads)
-            t.interrupt();
+        for (int i = players.length - 1; i >= 0; i--)
+            players[i].terminate();
+        for (int i = playerThreads.length - 1; i >= 0; i--)
+            playerThreads[i].interrupt();
+
     }
 
     /**
@@ -214,16 +216,21 @@ public class Dealer implements Runnable {
     private synchronized void sleepUntilWokenOrTimeout() {
         // TODO implement
         try {
-            /*if (reshuffleTime - System.currentTimeMillis() < env.config.turnTimeoutWarningMillis)
-                this.wait(10);
-            else*/
-                this.wait(100);
+            /*
+             * if (reshuffleTime - System.currentTimeMillis() <
+             * env.config.turnTimeoutWarningMillis)
+             * this.wait(10);
+             * else
+             */
+            this.wait(100);
         } catch (InterruptedException e) {
         }
-        /*try {
-            Thread.sleep(100);
-        } catch (InterruptedException e) {
-        }*/
+        /*
+         * try {
+         * Thread.sleep(100);
+         * } catch (InterruptedException e) {
+         * }
+         */
     }
 
     /**
@@ -248,26 +255,26 @@ public class Dealer implements Runnable {
     private void removeAllCardsFromTable() {
         // TODO implement
         synchronized (table) {
-            if (table.countCards() == 12) {
-                for (int i = 0; i < table.tokenToSlot.length; i++) {
-                    synchronized (players[i]) {
-                        for (int j = 0; j < table.tokenToSlot[i].length; j++) {
-                            players[i].removeToken(j);
-                        }
+            for (int i = 0; i < table.tokenToSlot.length; i++) {
+                synchronized (players[i]) {
+                    for (int j = 0; j < table.tokenToSlot[i].length; j++) {
+                        players[i].removeToken(j);
                     }
                 }
-                for (int i = 0; i < table.slotToCard.length; i++) {
+            }
+            for (int i = 0; i < table.slotToCard.length; i++) {
+                if (table.slotToCard[i] != null) {
                     deck.add(table.slotToCard[i]);
                     table.removeCard(i);
                 }
-                for (int i = 0; i < players.length; i++) {
-                    synchronized (players[i]) {
-                        players[i].notifyAll();
-                    }
-                }
-                waitingPlayers = new LinkedList<>();
-                reshuffleTime = System.currentTimeMillis() + env.config.turnTimeoutMillis;
             }
+            for (int i = 0; i < players.length; i++) {
+                synchronized (players[i]) {
+                    players[i].notifyAll();
+                }
+            }
+            waitingPlayers = new LinkedList<>();
+            reshuffleTime = System.currentTimeMillis() + env.config.turnTimeoutMillis;
         }
     }
 

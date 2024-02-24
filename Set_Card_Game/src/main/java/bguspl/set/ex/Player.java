@@ -151,8 +151,8 @@ public class Player implements Runnable {
     public void terminate() {
         // TODO implement
         terminate = true;
-        playerThread.interrupt();
-        aiThread.interrupt();
+        if(!human)
+            aiThread.interrupt();
     }
 
     private void play() {
