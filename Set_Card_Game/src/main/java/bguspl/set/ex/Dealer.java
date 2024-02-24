@@ -86,7 +86,7 @@ public class Dealer implements Runnable {
      */
     private void timerLoop() {
         while (!terminate && System.currentTimeMillis() < reshuffleTime) {
-            sleepUntilWokenOrTimeout();
+            //sleepUntilWokenOrTimeout();
             updateTimerDisplay(false);
             removeCardsFromTable();
             placeCardsOnTable();
@@ -101,6 +101,8 @@ public class Dealer implements Runnable {
         terminate = true;
         for (Player p : players)
             p.terminate();
+        for(Thread t : playerThreads)
+            t.interrupt();
     }
 
     /**
@@ -276,6 +278,7 @@ public class Dealer implements Runnable {
         // TODO implement
         int[] winners = findWinners();
         env.ui.announceWinner(winners);
+        this.terminate();
     }
 
     private int[] findWinners() {

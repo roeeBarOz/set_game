@@ -1,7 +1,7 @@
 package bguspl.set.ex;
 
 import bguspl.set.Env;
-import javafx.scene.control.TableSelectionModel;
+
 
 import java.util.Arrays;
 import java.util.LinkedList;
