@@ -152,10 +152,10 @@ public class Dealer implements Runnable {
                 if (isSet) {
                     for (int i = 0; i < players[awardplayer].set.length; i++) {
                         int slotId = players[awardplayer].set[i];
-                        for (int j = 0; j < players.length; j++) {
-                            players[j].removeToken(slotId);
-                        }
-                        table.removeCard(slotId);
+                            for (int j = 0; j < players.length; j++) {
+                                players[j].removeToken(slotId);
+                            }
+                            table.removeCard(slotId);
                     }
                     reshuffleTime = System.currentTimeMillis() + env.config.turnTimeoutMillis;
                     updateTimerDisplay(SHOULD_RESET_TIME);
@@ -166,10 +166,10 @@ public class Dealer implements Runnable {
                 }
             }
         }
-        for(int i = 0; i < players.length; i++)
-        synchronized (players[i]) {
+        for (int i = 0; i < players.length; i++)
+            synchronized (players[i]) {
                 players[i].notifyAll();
-        }
+            }
     }
 
     /**

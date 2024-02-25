@@ -167,7 +167,7 @@ public class Player implements Runnable {
         if (shouldPoint) {
             point();
             shouldPoint = false;
-    } else if (shouldPenalty) {
+        } else if (shouldPenalty) {
             penalty();
             shouldPenalty = false;
         }
@@ -201,11 +201,16 @@ public class Player implements Runnable {
                     } else if (activeTokens < env.config.featureSize) {
                         addToken(slot);
                         if (activeTokens == env.config.featureSize) {
+                            synchronized (dealer.waitingPlayers) {
+                                dealer.addWaiting(id);
+                            }
                             synchronized (dealer) {
                                 dealer.notify();
-                                synchronized (dealer.waitingPlayers) {
-                                    dealer.addWaiting(id);
-                                }
+                            }
+                            synchronized (this) {
+                            try {
+                                this.wait();
+                            } catch (InterruptedException e) {}
                             }
                         }
                     }
