@@ -11,14 +11,26 @@ with a short description of:
 --------------------
 
 1. Fully supporting all configuration fields and avoiding the use of magic numbers
+For magic numbers:
+1. we initialized each value as a final variable to represent the numbers.
+2. the magic numbers were initialized at the top of the Dealer,Table and Player classes at the top of each class 
 
-We are not entitled to this bonus.
-
+For config support:
+1. for the hints property, we added a boolean named shouldPrintHints to Dealer. it will be true iff we erased cards from the table, or the game just started.
+   for other properties, we simply used them wherever we needed them.
+2. we used them in Dealer in the methods: constructor, run, timerLoop, removeCardFromTable, sleepUntilWokenOrTimeout, updateTimerDisplay, 
+   removeAllCardFromTable. in Player: constructor, createArtificialIntelligence, tokenHandling, point, and in penalty. in
+   Table: constructor, placeCard, removeCard, and in getAllEmptySlots.
+3. we tried changing the values and running the program. 
 --------------------
 
 2. Terminating all threads (that you created) gracefully and in reverse order to the order they were created in.
 
-We are not entitled to this bonus.
+1. We terminated all of our created threads at the terminate methods of Dealer and Player and they way we did it in reverse order was using a for loop
+   where we started the index at the end of each array and went down.
+2.  it was used in the terminate methods of Player and Dealer.
+3. We printed the order that they were deleted in in the terminal and the fact that the build succeeded and ended also implies that all of the threads 
+   stopped operating. 
 
 --------------------
 
@@ -35,4 +47,7 @@ We are not entitled to this bonus.
 changed on the display, key input needs to be handled, etc.) and the only threads created by you are:
 1 thread per player + 1 additional thread for non-human players.
 
-We are not entitled to this bonus.
+1. we used wait commands to put the threads into blocked mode until they were notified to wake up/ until a set amount of time has passed
+2. in the Dealer class it was used at: terminate, removeCardFromTable, sleepUntilWokenOrTimeout, removeAllCardFromTable.
+   in the Player class it was used at: run, keyPressed, tokenHandling.
+3. we ran the program and made sure the build succeeded and that the log said that the threads were terminated.

@@ -2,7 +2,6 @@ package bguspl.set.ex;
 
 import bguspl.set.Env;
 
-
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
@@ -53,13 +52,13 @@ public class Table {
         this.env = env;
         this.slotToCard = slotToCard;
         this.cardToSlot = cardToSlot;
-        tokenToSlot = new Boolean[env.config.players][12];
+        tokenToSlot = new Boolean[env.config.players][env.config.tableSize];
         for (int i = 0; i < tokenToSlot.length; i++) {
             for (int j = 0; j < tokenToSlot[i].length; j++) {
                 tokenToSlot[i][j] = false;
             }
         }
-        this.slots = new Object[12];
+        this.slots = new Object[env.config.tableSize];
         for (int i = 0; i < slots.length; i++)
             slots[i] = new Object();
         tableSemaphore = new Semaphore(1, true);
@@ -116,7 +115,8 @@ public class Table {
         synchronized (slots[slot]) {
             try {
                 tableSemaphore.acquire();
-            } catch (InterruptedException e) {}
+            } catch (InterruptedException e) {
+            }
             try {
                 Thread.sleep(env.config.tableDelayMillis);
             } catch (InterruptedException ignored) {
@@ -141,7 +141,8 @@ public class Table {
         synchronized (slots[slot]) {
             try {
                 tableSemaphore.acquire();
-            } catch (InterruptedException e) {}
+            } catch (InterruptedException e) {
+            }
             try {
                 Thread.sleep(env.config.tableDelayMillis);
             } catch (InterruptedException ignored) {
@@ -163,12 +164,13 @@ public class Table {
      */
     public void placeToken(int player, int slot) {
         // TODO implement
-            try {
-                tableSemaphore.acquire();
-            } catch (InterruptedException e) {}
-            env.ui.placeToken(player, slot);
-            tokenToSlot[player][slot] = true;
-            tableSemaphore.release();
+        try {
+            tableSemaphore.acquire();
+        } catch (InterruptedException e) {
+        }
+        env.ui.placeToken(player, slot);
+        tokenToSlot[player][slot] = true;
+        tableSemaphore.release();
     }
 
     /**
@@ -180,13 +182,14 @@ public class Table {
      */
     public boolean removeToken(int player, int slot) {
         // TODO implement
-            try {
-                tableSemaphore.acquire();
-            } catch (InterruptedException e) {}
-            env.ui.removeToken(player, slot);
-            tokenToSlot[player][slot] = false;
-            tableSemaphore.release();
-            return false;
+        try {
+            tableSemaphore.acquire();
+        } catch (InterruptedException e) {
+        }
+        env.ui.removeToken(player, slot);
+        tokenToSlot[player][slot] = false;
+        tableSemaphore.release();
+        return false;
     }
 
     /*
@@ -194,7 +197,7 @@ public class Table {
      **/
     public List<Integer> getAllEmptySlots() {
         List<Integer> output = new LinkedList<Integer>();
-        for (int i = 0; i < 12; i++) {
+        for (int i = 0; i < env.config.tableSize; i++) {
             if (slotToCard[i] == null)
                 output.add(i);
         }

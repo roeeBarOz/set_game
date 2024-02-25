@@ -15,6 +15,8 @@ import bguspl.set.Env;
  */
 public class Player implements Runnable {
 
+    final int EMPTY = -1;
+    final int SECOND_IN_MILLIS = 1000;
     /**
      * The game environment object.
      */
@@ -86,10 +88,10 @@ public class Player implements Runnable {
         this.human = human;
         this.dealer = dealer;
         this.activeTokens = 0;
-        keyspressed = new LinkedBlockingQueue<>(3);
-        set = new int[3];
+        keyspressed = new LinkedBlockingQueue<>(env.config.featureSize);
+        set = new int[env.config.featureSize];
         for (int i = 0; i < set.length; i++)
-            set[i] = -1;
+            set[i] = EMPTY;
         terminate = false;
         shouldPoint = false;
         shouldPenalty = false;
@@ -109,10 +111,15 @@ public class Player implements Runnable {
         else {
             while (!terminate) {
                 // TODO implement main player loop
+                synchronized (this) {
+                    try {
+                        this.wait();
+                    } catch (InterruptedException e) {
+                    }
+                }
                 play();
             }
         }
-        System.out.println("bye bye!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
         if (!human)
             try {
                 aiThread.join();
@@ -135,7 +142,7 @@ public class Player implements Runnable {
             while (!terminate) {
                 // TODO implement player key press simulator
                 if (dealer.cardsPlaced) {
-                    int pressSlot = rnd.nextInt(12);
+                    int pressSlot = rnd.nextInt(env.config.tableSize);
                     this.keyspressed.add(pressSlot);
                     play();
                 }
@@ -151,18 +158,18 @@ public class Player implements Runnable {
     public void terminate() {
         // TODO implement
         terminate = true;
-        if(!human)
+        if (!human)
             aiThread.interrupt();
     }
 
     private void play() {
         tokenHandling();
         if (shouldPoint) {
-            shouldPoint = false;
             point();
-        } else if (shouldPenalty) {
-            shouldPenalty = false;
+            shouldPoint = false;
+    } else if (shouldPenalty) {
             penalty();
+            shouldPenalty = false;
         }
     }
 
@@ -173,11 +180,14 @@ public class Player implements Runnable {
      */
     public void keyPressed(int slot) {
         // TODO implement
-        if (dealer.cardsPlaced) {
+        if (dealer.cardsPlaced && !shouldPenalty && !shouldPoint) {
             try {
                 keyspressed.put(slot);
             } catch (InterruptedException e) {
             }
+        }
+        synchronized (this) {
+            this.notify();
         }
     }
 
@@ -188,31 +198,15 @@ public class Player implements Runnable {
                 if (table.slotToCard[slot] != null) {
                     if (table.isTokenPlaced(id, slot)) {
                         removeToken(slot);
-                    } else if (activeTokens < 3) {
+                    } else if (activeTokens < env.config.featureSize) {
                         addToken(slot);
-                        if (activeTokens == 3) {
-                            // dealer.addToWaiting(id);
-                            synchronized (dealer.waitingPlayers) {
-                                dealer.addWaiting(id);
-                            }
-                            synchronized (this) {
-                                try {
-                                    this.wait();
-                                } catch (InterruptedException e) {
-                                    this.notifyAll();
+                        if (activeTokens == env.config.featureSize) {
+                            synchronized (dealer) {
+                                dealer.notify();
+                                synchronized (dealer.waitingPlayers) {
+                                    dealer.addWaiting(id);
                                 }
                             }
-                            // dealer.notifyAll();
-                            /*
-                             * try {
-                             * env.logger.info("player " + (id + 1) + " in lock");
-                             * // System.out.println("Player: " + id + " is sleeping");
-                             * this.wait();
-                             * env.logger.info("player " + (id + 1) + " out of lock");
-                             * System.out.println("tcatchhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh");
-                             * } catch (InterruptedException e) {
-                             * }
-                             */
                         }
                     }
                 }
@@ -225,7 +219,7 @@ public class Player implements Runnable {
             boolean isRemoved = false;
             for (int i = 0; i < set.length; i++)
                 if (set[i] == slot) {
-                    set[i] = -1;
+                    set[i] = EMPTY;
                     isRemoved = true;
                     break;
                 }
@@ -238,13 +232,15 @@ public class Player implements Runnable {
 
     public void addToken(int slot) {
         synchronized (table.slots[slot]) {
-            for (int i = 0; i < set.length; i++)
-                if (set[i] == -1) {
-                    set[i] = slot;
-                    break;
-                }
-            activeTokens++;
-            table.placeToken(id, slot);
+            if (table.slotToCard[slot] != null) {
+                for (int i = 0; i < set.length; i++)
+                    if (set[i] == EMPTY) {
+                        set[i] = slot;
+                        break;
+                    }
+                activeTokens++;
+                table.placeToken(id, slot);
+            }
         }
     }
 
@@ -273,11 +269,11 @@ public class Player implements Runnable {
      */
     public void penalty() {
         // TODO implement
-        for (long i = env.config.penaltyFreezeMillis; i > 0; i -= 1000) {
+        for (long i = env.config.penaltyFreezeMillis; i > 0; i -= SECOND_IN_MILLIS) {
 
             env.ui.setFreeze(id, i);
             try {
-                Thread.sleep(1000);
+                Thread.sleep(SECOND_IN_MILLIS);
             } catch (InterruptedException e) {
             }
         }
