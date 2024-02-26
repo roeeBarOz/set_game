@@ -40,8 +40,18 @@ config.turnTimeoutMillis < 0: display nothing.
 config.turnTimeoutMillis = 0: display a timer since the last action (reshuffle or set collected).
 Note: in modes without a countdown timer the dealer must ensure there is always at least one legal set on the table.
 
-We are not entitled to this bonus.
+for the case where config.turnTimeoutMillis < 0:
+1. we added ifs to check the state of the config.turnTimeoutMillis and if it was lower than zero, we ignored the game time and did manual checks
+of the sets of the table.
+2. in the dealer class at the run, removeCardFromTable, removeAllCardFromTable and timer loop methods.
+3. we changed the config.turnTimeoutMillis to be lower than zero and made sure the project ran smootly from start to finish and the build succeeded.
 
+for the case where config.turnTimeoutMillis = 0:
+1. we added an int called lastActionTime in dealer. it stores the time in millis since the last remove of cards made in the game. then we added ifs to
+distinguish between the cases where config.turnTimeoutMillis is larger than 0 from the cases where it's equal to zero and if it was equal to zero we 
+also added manual checks of the table to see whether or not we have sets on it.
+2. in the dealer class at the run, timer loop, removeCardFromTable, removeAllCardFromTable and updateTimerDisplay methods.
+3. we changed the config.turnTimeoutMillis to be equal to zero and made sure the project ran smootly from start to finish and the build succeeded.
 --------------------
 
 4. Making sure that the threads do not wake up unless some actual job needs to be done (e.g., a value needs to be

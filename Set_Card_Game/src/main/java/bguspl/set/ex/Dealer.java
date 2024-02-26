@@ -15,8 +15,8 @@ import java.util.stream.IntStream;
  */
 public class Dealer implements Runnable {
 
-    final int STARTING_RANGE = 0;
-    final int ONE = 1;
+    final int START = 0;
+    final int SETS_TO_CHECK = 1;
     final int EMPTY = -1;
     final int ADD_WAITING_SLEEP_MILLIS = 10;
     final int TIME_WARNING_WAIT = 10;
@@ -52,6 +52,7 @@ public class Dealer implements Runnable {
     private Thread[] playerThreads;
     public boolean cardsPlaced;
     private boolean shouldPrintHints;
+    private long lastActionTime;
 
     // public Semaphore dealerSemaphore;
 
@@ -59,11 +60,12 @@ public class Dealer implements Runnable {
         this.env = env;
         this.table = table;
         this.players = players;
-        deck = IntStream.range(STARTING_RANGE, env.config.deckSize).boxed().collect(Collectors.toList());
+        deck = IntStream.range(START, env.config.deckSize).boxed().collect(Collectors.toList());
         waitingPlayers = new LinkedList<Integer>();
         playerThreads = new Thread[env.config.players];
         cardsPlaced = false;
         shouldPrintHints = true;
+        lastActionTime = 0;
     }
 
     /**
@@ -75,15 +77,21 @@ public class Dealer implements Runnable {
             playerThreads[i] = new Thread(players[i]);
             playerThreads[i].start();
         }
-        reshuffleTime = System.currentTimeMillis() + env.config.turnTimeoutMillis;
+        if (env.config.turnTimeoutMillis >= 0)
+            reshuffleTime = System.currentTimeMillis() + env.config.turnTimeoutMillis;
         env.logger.info("thread " + Thread.currentThread().getName() + " starting.");
         while (!shouldFinish()) {
             placeCardsOnTable();
             timerLoop();
-            updateTimerDisplay(SHOULD_RESET_TIME);
-            removeAllCardsFromTable();
+            if (env.config.turnTimeoutMillis >= 0)
+                updateTimerDisplay(SHOULD_RESET_TIME);
+            if (!deck.isEmpty()){
+                removeAllCardsFromTable();
+                lastActionTime = 0;
+            }
         }
         removeAllCardsFromTable();
+        lastActionTime = 0;
         announceWinners();
         env.logger.info("thread " + Thread.currentThread().getName() + " terminated.");
     }
@@ -93,14 +101,39 @@ public class Dealer implements Runnable {
      * not time out.
      */
     private void timerLoop() {
-        while (!terminate && System.currentTimeMillis() < reshuffleTime) {
+        while (!terminate && (System.currentTimeMillis() < reshuffleTime || env.config.turnTimeoutMillis == 0)) {
             if (shouldPrintHints && env.config.hints) {
                 table.hints();
                 shouldPrintHints = false;
             }
             sleepUntilWokenOrTimeout();
-            updateTimerDisplay(!SHOULD_RESET_TIME);
+            if (env.config.turnTimeoutMillis > 0)
+                updateTimerDisplay(!SHOULD_RESET_TIME);
+            else if (env.config.turnTimeoutMillis < 0) {
+                if (env.util.findSets(this.arrayToList(table.slotToCard), SETS_TO_CHECK).isEmpty()) {
+                    if (deck.isEmpty())
+                        terminate = true;
+                    else{
+                        removeAllCardsFromTable();
+                    }
+                }
+            }
+            else{
+                if (env.util.findSets(this.arrayToList(table.slotToCard), SETS_TO_CHECK).isEmpty()) {
+                    if (deck.isEmpty())
+                        terminate = true;
+                    else{
+                        removeAllCardsFromTable();
+                        lastActionTime = 0;
+                    }
+                }
+                updateTimerDisplay(!SHOULD_RESET_TIME);
+            }
+            int deckSizeBeforeRemove = deck.size();
             removeCardsFromTable();
+            if(deckSizeBeforeRemove > deck.size()){
+                lastActionTime = 0;
+            }
             placeCardsOnTable();
         }
     }
@@ -131,7 +164,7 @@ public class Dealer implements Runnable {
      * @return true iff the game should be finished.
      */
     private boolean shouldFinish() {
-        return terminate || env.util.findSets(deck, 1).size() == 0;
+        return terminate || env.util.findSets(deck, SETS_TO_CHECK).isEmpty();
     }
 
     /**
@@ -152,13 +185,17 @@ public class Dealer implements Runnable {
                 if (isSet) {
                     for (int i = 0; i < players[awardplayer].set.length; i++) {
                         int slotId = players[awardplayer].set[i];
-                            for (int j = 0; j < players.length; j++) {
-                                players[j].removeToken(slotId);
-                            }
-                            table.removeCard(slotId);
+                        for (int j = 0; j < players.length; j++) {
+                            players[j].removeToken(slotId);
+                        }
+                        table.removeCard(slotId);
                     }
-                    reshuffleTime = System.currentTimeMillis() + env.config.turnTimeoutMillis;
-                    updateTimerDisplay(SHOULD_RESET_TIME);
+                    if (env.config.turnTimeoutMillis >= 0) {
+                        if(env.config.turnTimeoutMillis == 0)
+                            lastActionTime = 0;
+                        reshuffleTime = System.currentTimeMillis() + env.config.turnTimeoutMillis;
+                        updateTimerDisplay(SHOULD_RESET_TIME);
+                    }
                     players[awardplayer].shouldPoint = true;
                     shouldPrintHints = true;
                 } else {
@@ -181,9 +218,9 @@ public class Dealer implements Runnable {
         Collections.shuffle(deck);
         List<Integer> empties = table.getAllEmptySlots();
         Random rand = new Random();
-        while (!deck.isEmpty() && empties.size() > 0) {
+        while (!deck.isEmpty() && !empties.isEmpty()) {
             int randomIndex = rand.nextInt(empties.size());
-            table.placeCard(deck.remove(0), empties.remove(randomIndex));
+            table.placeCard(deck.remove(START), empties.remove(randomIndex));
         }
         cardsPlaced = true;
     }
@@ -211,14 +248,25 @@ public class Dealer implements Runnable {
     private void updateTimerDisplay(boolean reset) {
         // TODO implement
         boolean color = false;
-        if (reset) {
-            env.ui.setCountdown(env.config.turnTimeoutMillis, color);
-        } else {
-            if (reshuffleTime - System.currentTimeMillis() < env.config.turnTimeoutWarningMillis)
-                color = true;
-            env.ui.setCountdown(reshuffleTime - System.currentTimeMillis(), color);
+        if (env.config.turnTimeoutMillis > 0) {
+            if (reset) {
+                env.ui.setCountdown(env.config.turnTimeoutMillis, color);
+            } else {
+                if (reshuffleTime - System.currentTimeMillis() < env.config.turnTimeoutWarningMillis)
+                    color = true;
+                env.ui.setCountdown(reshuffleTime - System.currentTimeMillis(), color);
+            }
         }
-
+        else if(env.config.turnTimeoutMillis == 0){
+            if(reset){
+                lastActionTime = 0;
+                reshuffleTime = System.currentTimeMillis();
+            }
+            else{
+                lastActionTime = System.currentTimeMillis() - reshuffleTime;
+            }
+            env.ui.setCountdown(lastActionTime, color);
+        }
     }
 
     /**
@@ -246,7 +294,11 @@ public class Dealer implements Runnable {
                 }
             }
             waitingPlayers = new LinkedList<>();
-            reshuffleTime = System.currentTimeMillis() + env.config.turnTimeoutMillis;
+            if (env.config.turnTimeoutMillis >= 0){
+                if(env.config.turnTimeoutMillis == 0)
+                    lastActionTime = 0;
+                reshuffleTime = System.currentTimeMillis() + env.config.turnTimeoutMillis;
+            }
             shouldPrintHints = true;
         }
     }
@@ -267,13 +319,13 @@ public class Dealer implements Runnable {
             if (p.score() > max)
                 max = p.score();
         }
-        int winnerCount = 0;
+        int winnerCount = 0; // initalize counter
         for (Player p : players) {
             if (p.score() == max)
                 winnerCount++;
         }
         int[] winners = new int[winnerCount];
-        winnerCount = 0;
+        winnerCount = 0; // initialize index
         for (Player p : players) {
             if (p.score() == max) {
                 winners[winnerCount] = p.id;
@@ -307,5 +359,14 @@ public class Dealer implements Runnable {
         } catch (InterruptedException e) {
         }
         waitingPlayers.add(id);
+    }
+
+    private List<Integer> arrayToList(Integer[] cards) {
+        List<Integer> tableDeck = new LinkedList<>();
+        for (int i = 0; i < cards.length; i++) {
+            if (cards[i] != null)
+                tableDeck.add(cards[i]);
+        }
+        return tableDeck;
     }
 }
