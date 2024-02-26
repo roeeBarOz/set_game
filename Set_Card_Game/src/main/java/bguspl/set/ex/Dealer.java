@@ -265,7 +265,7 @@ public class Dealer implements Runnable {
             else{
                 lastActionTime = System.currentTimeMillis() - reshuffleTime;
             }
-            env.ui.setCountdown(lastActionTime, color);
+            env.ui.setElapsed(lastActionTime);
         }
     }
 
