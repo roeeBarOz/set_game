@@ -12,8 +12,9 @@ with a short description of:
 
 1. Fully supporting all configuration fields and avoiding the use of magic numbers
 For magic numbers:
-1. we initialized each value as a final variable to represent the numbers.
-2. the magic numbers were initialized at the top of the Dealer,Table and Player classes at the top of each class 
+1. we initialized each value as a final variable to represent the magic numbers.
+2. the magic numbers were initialized at the top of the Dealer,Table and Player classes at the top of each class .
+3. we ran the project after creating the variables and made sure everything was working the same.
 
 For config support:
 1. for the hints property, we added a boolean named shouldPrintHints to Dealer. it will be true iff we erased cards from the table, or the game just started.
